@@ -21,7 +21,7 @@ console.log(pg)
 const app = express();
 
 app.use(async (req, res, next) => {
-    const path = req.path;
+    const path = req.get("host");
     console.log(path);
 
     try {
