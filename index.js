@@ -30,7 +30,7 @@ app.use(async (req, res, next) => {
         if (!target) {
             const result = await pg.query(
                 "SELECT target_route FROM routestable WHERE url = $1",
-                [path]
+                ["https://" + path]
             );
 
             if (result.rowCount === 0) {
