@@ -22,7 +22,6 @@ const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
 // Regular HTTP request proxying
 app.use(async (req, res) => {
     const host = req.get("host");
-
     try {
         let target = await redis.get("routes:" + host);
 
@@ -53,8 +52,6 @@ const server = http.createServer(app);
 // WebSocket proxying
 server.on("upgrade", async (req, socket, head) => {
     const host = req.headers.host;
-    console.log(`WebSocket upgrade for host: ${host}`);
-
     try {
         let target = await redis.get("routes:" + host);
 
