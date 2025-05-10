@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select a Site</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f4f4f4;
+    }
+    .container {
+      text-align: center;
+      background-color: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 15px 30px;
+      font-size: 18px;
+      margin: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #007BFF;
+      color: white;
+    }
+    .canlite-button {
+      background-color: #28a745;
+    }
+    .brunyixl-button {
+      background-color: #ffc107;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Which site do you want this link to be for?</h1>
+  <button class="canlite-button" onclick="window.location.href='/canlite'">CanLite</button>
+  <button class="brunyixl-button" onclick="window.location.href='/brunyixl'">BrunysIXL</button>
+</div>
+</body>
+</html>

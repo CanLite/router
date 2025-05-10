@@ -2,6 +2,8 @@ const express = require("express");
 const { createClient } = require("redis");
 const { Pool } = require("pg");
 const httpProxy = require("http-proxy");
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 const http = require("http"); // Use http unless you have SSL certs for https
 require("dotenv").config();
 
@@ -18,6 +20,8 @@ const pg = new Pool({
 
 const app = express();
 const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Regular HTTP request proxying
 app.use(async (req, res) => {
@@ -32,7 +36,13 @@ app.use(async (req, res) => {
             );
 
             if (result.rowCount === 0) {
-                target = "http://127.0.0.1:6676"
+                if(req.path === "/canlite") {
+                    await redis.set("routes:" + host, "http://127.0.0.1:6676");
+                } else if (req.path === "/brunyixl") {
+                    await redis.set("routes:" + host, "http://127.0.0.1:6457");
+                } else {
+                    res.sendFile(path.join(__dirname + "app.html"))
+                }
             } else {
                 target = result.rows[0].target_route;
             }
