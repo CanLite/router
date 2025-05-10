@@ -16,10 +16,13 @@ const pg = new Pool({
     port: 5432,
 });
 
+console.log(pg)
+
 const app = express();
 
 app.use(async (req, res, next) => {
     const path = req.path;
+    console.log(path);
 
     try {
         let target = await redis.get("routes:" + path);
