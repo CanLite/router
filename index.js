@@ -22,7 +22,6 @@ const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
 // Regular HTTP request proxying
 app.use(async (req, res) => {
     const host = req.get("host");
-    console.log(`HTTP request for host: ${host}`);
 
     try {
         let target = await redis.get("routes:" + host);
@@ -35,9 +34,9 @@ app.use(async (req, res) => {
 
             if (result.rowCount === 0) {
                 target = "http://127.0.0.1:6676"
+            } else {
+                target = result.rows[0].target_route;
             }
-
-            target = result.rows[0].target_route;
             await redis.set("routes:" + host, target);
         }
 
