@@ -34,7 +34,7 @@ app.use(async (req, res, next) => {
             );
 
             if (result.rowCount === 0) {
-                return res.status(404).send("Not found");
+                return res.status(404).send("Updating. Be back soon!");
             }
 
             target = result.rows[0].target_route;
