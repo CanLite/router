@@ -20,8 +20,6 @@ const pg = new Pool({
 
 const app = express();
 const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 // Regular HTTP request proxying
 app.use(async (req, res) => {
