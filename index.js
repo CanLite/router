@@ -3,7 +3,7 @@ const { createProxyMiddleware } = require("http-proxy-middleware");
 const { createClient } = require("redis");
 const { Pool } = require("pg");
 const fs = require("fs");
-const https = require("https");
+const https = require("http");
 
 const redis = createClient();
 redis.connect().catch(console.error);
