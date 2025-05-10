@@ -6,7 +6,6 @@ const fs = require("fs");
 const https = require("http");
 require('dotenv').config();
 
-dotenv.config();
 const redis = createClient();
 redis.connect().catch(console.error);
 
