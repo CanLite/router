@@ -1,10 +1,9 @@
 const express = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
 const { createClient } = require("redis");
 const { Pool } = require("pg");
-const fs = require("fs");
-const https = require("http");
-require('dotenv').config();
+const httpProxy = require("http-proxy");
+const http = require("http"); // Use http unless you have SSL certs for https
+require("dotenv").config();
 
 const redis = createClient();
 redis.connect().catch(console.error);
@@ -17,21 +16,21 @@ const pg = new Pool({
     port: 5432,
 });
 
-console.log(pg)
-
 const app = express();
+const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
 
-app.use(async (req, res, next) => {
-    const path = req.get("host");
-    console.log(path);
+// Regular HTTP request proxying
+app.use(async (req, res) => {
+    const host = req.get("host");
+    console.log(`HTTP request for host: ${host}`);
 
     try {
-        let target = await redis.get("routes:" + path);
+        let target = await redis.get("routes:" + host);
 
         if (!target) {
             const result = await pg.query(
                 "SELECT target_route FROM routestable WHERE url = $1",
-                ["https://" + path]
+                ["https://" + host]
             );
 
             if (result.rowCount === 0) {
@@ -39,21 +38,49 @@ app.use(async (req, res, next) => {
             }
 
             target = result.rows[0].target_route;
-
-            await redis.set("routes:" + path, target);
+            await redis.set("routes:" + host, target);
         }
 
-        return createProxyMiddleware({
-            target,
-            changeOrigin: true,
-            pathRewrite: (pathReq) => pathReq,
-        })(req, res, next);
+        proxy.web(req, res, { target });
     } catch (err) {
         console.error("Proxy error:", err);
         res.status(500).send("Internal server error");
     }
 });
 
-https.createServer(app).listen(9091, () => {
-    console.log("Proxy forwarding server listening on port 9091");
+// Create the HTTP server
+const server = http.createServer(app);
+
+// WebSocket proxying
+server.on("upgrade", async (req, socket, head) => {
+    const host = req.headers.host;
+    console.log(`WebSocket upgrade for host: ${host}`);
+
+    try {
+        let target = await redis.get("routes:" + host);
+
+        if (!target) {
+            const result = await pg.query(
+                "SELECT target_route FROM routestable WHERE url = $1",
+                ["https://" + host]
+            );
+
+            if (result.rowCount === 0) {
+                socket.destroy(); // No route = close the socket
+                return;
+            }
+
+            target = result.rows[0].target_route;
+            await redis.set("routes:" + host, target);
+        }
+
+        proxy.ws(req, socket, head, { target });
+    } catch (err) {
+        console.error("WebSocket proxy error:", err);
+        socket.destroy();
+    }
+});
+
+server.listen(9091, () => {
+    console.log("Proxy forwarding server (HTTP + WebSocket) listening on port 9091");
 });
