@@ -5,7 +5,7 @@ const httpProxy = require("http-proxy");
 const { fileURLToPath } = require("url");
 const { dirname } = require("path");
 const http = require("http"); // Use http unless you have SSL certs for https
-import path from "path";
+const path = require("path");
 require("dotenv").config();
 
 const redis = createClient();
