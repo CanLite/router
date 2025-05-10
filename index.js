@@ -34,7 +34,7 @@ app.use(async (req, res) => {
             );
 
             if (result.rowCount === 0) {
-                return res.status(404).send("Updating. Be back soon!");
+                target = "http://127.0.0.1:6676"
             }
 
             target = result.rows[0].target_route;
