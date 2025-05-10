@@ -29,7 +29,7 @@ app.use(async (req, res, next) => {
 
         if (!target) {
             const result = await pg.query(
-                "SELECT target_route FROM routes WHERE url = $1",
+                "SELECT target_route FROM routestable WHERE url = $1",
                 [path]
             );
 
