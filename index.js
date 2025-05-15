@@ -1,95 +1,114 @@
-const express = require("express");
-const { createClient } = require("redis");
-const { Pool } = require("pg");
-const httpProxy = require("http-proxy");
-const { fileURLToPath } = require("url");
-const { dirname } = require("path");
-const http = require("http"); // Use http unless you have SSL certs for https
-const path = require("path");
-require("dotenv").config();
+import express from 'express';
+import { createClient } from 'redis';
+import { Pool } from 'pg';
+import httpProxy from 'http-proxy';
+import http from 'http';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const redis = createClient();
-redis.connect().catch(console.error);
+dotenv.config();
 
-const pg = new Pool({
-    user: "postgres",
-    host: "localhost",
-    database: "routes",
-    password: process.env.PASSWORD,
-    port: 5432,
+// Constants & Config
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PORT = process.env.PORT || 9091;
+const REDIS_TTL = 3600; // seconds
+const FALLBACK_HTML = path.join(__dirname, 'new.html');
+
+// Default route overrides (host->path mapping)
+const pathOverrides = {
+  canlite: 'http://127.0.0.1:6676',
+  brunyixl: 'http://127.0.0.1:6457',
+};
+
+// Initialize clients
+const redisClient = createClient();
+redisClient.connect().catch(console.error);
+
+const pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
 });
 
-const app = express();
 const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
 
-// Regular HTTP request proxying
-app.use(async (req, res) => {
-    const host = req.get("host");
-    try {
-        let target = await redis.get("routes:" + host);
+// Express setup
+const app = express();
+app.disable('x-powered-by');
+app.use(helmet());
+app.use(compression());
+app.use(morgan('combined'));
 
-        if (!target) {
-            const result = await pg.query(
-                "SELECT target_route FROM routestable WHERE url = $1",
-                ["https://" + host]
-            );
+// Helper: resolve target for host & path
+async function resolveTarget(host, requestPath) {
+  const cacheKey = `routes:${host}`;
+  let target = await redisClient.get(cacheKey);
+  if (target) return target;
 
-            if (result.rowCount === 0) {
-                if(req.path === "/canlite") {
-                    target = "http://127.0.0.1:6676";
-                    await redis.set("routes:" + host, target);
-                    return res.redirect('/');
-                } else if (req.path === "/brunyixl") {
-                    target = "http://127.0.0.1:6457";
-                    await redis.set("routes:" + host, target);
-                    return res.redirect('/');
-                } else {
-                    return res.sendFile(path.join(__dirname + "/new.html"))
-                }
-            } else {
-                target = result.rows[0].target_route;
-            }
-            await redis.set("routes:" + host, target);
-        }
+  // Database lookup
+  const url = `https://${host}`;
+  const { rows } = await pgPool.query(
+    'SELECT target_route FROM routestable WHERE url = $1 LIMIT 1',
+    [url]
+  );
 
-        proxy.web(req, res, { target });
-    } catch (err) {
-        console.error("Proxy error:", err);
-        res.status(500).send("Internal server error");
+  if (rows.length) {
+    target = rows[0].target_route;
+  } else {
+    // path-based override
+    const key = requestPath.replace(/^\//, '');
+    if (pathOverrides[key]) {
+      target = pathOverrides[key];
     }
-});
+  }
 
-// Create the HTTP server
+  if (target) {
+    await redisClient.setEx(cacheKey, REDIS_TTL, target);
+  }
+  return target;
+}
+
+// Proxy handler for HTTP and WS
+async function handleProxy(req, res, isWebSocket = false, socket, head) {
+  try {
+    const host = req.headers.host;
+    const target = await resolveTarget(host, req.path);
+    if (!target) {
+      if (isWebSocket) {
+        return socket.destroy();
+      }
+      return res.sendFile(FALLBACK_HTML);
+    }
+
+    if (isWebSocket) {
+      proxy.ws(req, socket, head, { target });
+    } else {
+      proxy.web(req, res, { target });
+    }
+  } catch (err) {
+    console.error('Proxy error:', err);
+    if (isWebSocket) socket.destroy();
+    else res.status(502).send('Bad Gateway');
+  }
+}
+
+// Mount HTTP proxy on all routes
+app.use((req, res) => handleProxy(req, res));
+
+// Create HTTP server
 const server = http.createServer(app);
 
-// WebSocket proxying
-server.on("upgrade", async (req, socket, head) => {
-    const host = req.headers.host;
-    try {
-        let target = await redis.get("routes:" + host);
-
-        if (!target) {
-            const result = await pg.query(
-                "SELECT target_route FROM routestable WHERE url = $1",
-                ["https://" + host]
-            );
-
-            if (result.rowCount === 0) {
-                socket.destroy(); // No route = close the socket
-                return;
-            }
-
-            target = result.rows[0].target_route;
-            await redis.set("routes:" + host, target);
-        }
-
-        proxy.ws(req, socket, head, { target });
-    } catch (err) {
-        console.error("WebSocket proxy error:", err);
-        socket.destroy();
-    }
+// WebSocket upgrade
+server.on('upgrade', (req, socket, head) => {
+  handleProxy(req, null, true, socket, head);
 });
 
-server.listen(9091, () => {
-    console.log("Proxy forwarding server (HTTP + WebSocket) listening on port 9091");
+// Start server
+server.listen(PORT, () => {
+  console.log(`Proxy server listening on port ${PORT}`);
 });
