@@ -3,7 +3,6 @@ import { createClient } from 'redis';
 import { Pool } from 'pg';
 import httpProxy from 'http-proxy';
 import http from 'http';
-import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -39,7 +38,6 @@ const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
 // Express setup
 const app = express();
 app.disable('x-powered-by');
-app.use(helmet());
 app.use(compression());
 
 // Resolve proxy target
