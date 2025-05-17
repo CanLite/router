@@ -3,7 +3,7 @@ const { createClient } = require("redis");
 const { Pool } = require("pg");
 const httpProxy = require("http-proxy");
 const fileURLToPath = require("url");
-const dirname = require("path");
+const path = require("path");
 const http = require("http"); // Use http unless you have SSL certs for https
 require("dotenv").config();
 
