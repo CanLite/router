@@ -33,12 +33,38 @@ const pgPool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
-const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
+// Create proxy server with timeouts
+const proxy = httpProxy.createProxyServer({
+  ws: true,
+  changeOrigin: true,
+  timeout: 30000,        // socket connect timeout
+  proxyTimeout: 30000,   // target response timeout
+});
+
+// Handle proxy errors without logging
+proxy.on('error', (err, req, res) => {
+  if (res && !res.headersSent) {
+    res.writeHead(502, { 'Content-Type': 'text/plain' });
+    res.end('Bad gateway.');
+  } else if (req.socket) {
+    req.socket.destroy();
+  }
+});
 
 // Express setup
 const app = express();
 app.disable('x-powered-by');
 app.use(compression());
+
+// Helper to add a timeout around a promise
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), ms)
+    )
+  ]);
+}
 
 // Resolve proxy target
 async function resolveTarget(host, requestPath) {
@@ -48,8 +74,8 @@ async function resolveTarget(host, requestPath) {
 
   const url = `https://${host}`;
   const { rows } = await pgPool.query(
-    'SELECT target_route FROM routestable WHERE url = $1 LIMIT 1',
-    [url]
+      'SELECT target_route FROM routestable WHERE url = $1 LIMIT 1',
+      [url]
   );
 
   if (rows.length) {
@@ -59,23 +85,34 @@ async function resolveTarget(host, requestPath) {
     target = pathOverrides[key] || null;
   }
 
-  if (target) await redisClient.setEx(cacheKey, REDIS_TTL, target);
+  if (target) {
+    await redisClient.setEx(cacheKey, REDIS_TTL, target);
+  }
   return target;
 }
 
 // Proxy handler
 async function handleProxy(req, res, isWebSocket = false, socket, head) {
+  let target;
   try {
-    const target = await resolveTarget(req.headers.host, req.path);
-    if (!target) {
-      if (isWebSocket) return socket.destroy();
-      return res.sendFile(FALLBACK_HTML);
-    }
-    if (isWebSocket) proxy.ws(req, socket, head, { target });
-    else proxy.web(req, res, { target });
+    target = await withTimeout(
+        resolveTarget(req.headers.host, req.path),
+        2000
+    );
   } catch {
-    if (isWebSocket) socket.destroy();
-    else res.status(502).end();
+    if (res) return res.status(502).end('Bad gateway.');
+    if (socket) return socket.destroy();
+  }
+
+  if (!target) {
+    if (isWebSocket) return socket.destroy();
+    return res.sendFile(FALLBACK_HTML);
+  }
+
+  if (isWebSocket) {
+    proxy.ws(req, socket, head, { target });
+  } else {
+    proxy.web(req, res, { target });
   }
 }
 
@@ -84,5 +121,7 @@ app.use((req, res) => handleProxy(req, res));
 
 // Create and run server
 const server = http.createServer(app);
-server.on('upgrade', (req, socket, head) => handleProxy(req, null, true, socket, head));
+server.on('upgrade', (req, socket, head) =>
+    handleProxy(req, null, true, socket, head)
+);
 server.listen(PORT);
