@@ -35,11 +35,15 @@ app.use(async (req, res) => {
 
       if (result.rowCount === 0) {
         if(req.path === "/canlite") {
-          await redis.set("routes:" + host, "http://127.0.0.1:6676");
+          target = "http://127.0.0.1:6676";
+          await redis.set("routes:" + host, target);
+          return res.redirect('/');
         } else if (req.path === "/brunyixl") {
-          await redis.set("routes:" + host, "http://127.0.0.1:6457");
+          target = "http://127.0.0.1:6457";
+          await redis.set("routes:" + host, target);
+          return res.redirect('/');
         } else {
-          res.sendFile(path.join(__dirname + "/new.html"))
+          return res.sendFile(path.join(__dirname + "/new.html"))
         }
       } else {
         target = result.rows[0].target_route;
