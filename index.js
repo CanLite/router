@@ -35,7 +35,7 @@ app.use(async (req, res) => {
 
       if (result.rowCount === 0) {
         if(req.path === "/canlite") {
-          target = "http://127.0.0.1:6676";
+          target = "http://127.0.0.1:9909";
           await redis.set("routes:" + host, target);
           return res.redirect('/');
         } else if (req.path === "/brunyixl") {
