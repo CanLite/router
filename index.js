@@ -98,6 +98,22 @@ server.on("upgrade", async (req, socket, head) => {
   }
 });
 
+proxy.on('error', (err, req, res) => {
+  console.error('Proxy error:', err.message);
+  if (!res.headersSent) {
+    res.writeHead(502, { 'Content-Type': 'text/plain' });
+  }
+  res.end('Bad Gateway: Unable to reach target server');
+});
+
+server.on('error', (err, req, res) => {
+  console.error('Proxy error:', err.message);
+  if (!res.headersSent) {
+    res.writeHead(502, { 'Content-Type': 'text/plain' });
+  }
+  res.end('Bad Gateway: Unable to reach target server');
+});
+
 server.listen(9091, () => {
   console.log("Proxy forwarding server (HTTP + WebSocket) listening on port 9091");
 });
