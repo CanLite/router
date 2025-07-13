@@ -100,18 +100,30 @@ server.on("upgrade", async (req, socket, head) => {
 
 proxy.on('error', (err, req, res) => {
   console.error('Proxy error:', err.message);
-  if (!res.headersSent) {
-    res.writeHead(502, { 'Content-Type': 'text/plain' });
+  if (res && typeof res.writeHead === 'function') {
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'text/plain' });
+    }
+    res.end('Bad Gateway: Unable to reach target server');
+  } else if (res && typeof res.end === 'function') {
+    res.end();
+  } else {
+    // If res is undefined or something else, nothing to do
   }
-  res.end('Bad Gateway: Unable to reach target server');
 });
 
 server.on('error', (err, req, res) => {
   console.error('Proxy error:', err.message);
-  if (!res.headersSent) {
-    res.writeHead(502, { 'Content-Type': 'text/plain' });
+  if (res && typeof res.writeHead === 'function') {
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'text/plain' });
+    }
+    res.end('Bad Gateway: Unable to reach target server');
+  } else if (res && typeof res.end === 'function') {
+    res.end();
+  } else {
+    // If res is undefined or something else, nothing to do
   }
-  res.end('Bad Gateway: Unable to reach target server');
 });
 
 server.listen(9091, () => {
