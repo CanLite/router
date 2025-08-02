@@ -62,6 +62,7 @@ app.use(async (req, res) => {
     proxy.web(req, res, { target });
 
   } catch (err) {
+    console.error(err)
     res.status(500).send("Internal server error");
   }
 });
