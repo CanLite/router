@@ -1,6 +1,6 @@
 const express = require("express");
 const { createClient } = require("redis");
-const RedisStore = "connect-redis";
+const RedisStore = require("connect-redis");
 const { Pool } = require("pg");
 const httpProxy = require("http-proxy");
 const fileURLToPath = require("url");
