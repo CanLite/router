@@ -22,11 +22,8 @@ const pg = new Pool({
 
 const app = express();
 
-let redisClient = createClient();
-redisClient.connect().catch(console.error);
-
 let redisStore = new RedisStore({
-  client: redisClient,
+  client: redis,
   prefix: "router:",
 });
 
