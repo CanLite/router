@@ -82,6 +82,7 @@ app.use(async (req, res) => {
       req.session.target = target;
     }
     let targ = req.session.target;
+    console.log(targ)
     proxy.web(req, res, { targ });
 
   } catch (err) {
