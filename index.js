@@ -1,10 +1,12 @@
 const express = require("express");
 const { createClient } = require("redis");
+const RedisStore = "connect-redis";
 const { Pool } = require("pg");
 const httpProxy = require("http-proxy");
 const fileURLToPath = require("url");
 const path = require("path");
 const http = require("http"); // Use http unless you have SSL certs for https
+const session = require("express-session");
 require("dotenv").config();
 
 const redis = createClient();
@@ -19,47 +21,71 @@ const pg = new Pool({
 });
 
 const app = express();
+
+let redisClient = createClient();
+redisClient.connect().catch(console.error);
+
+let redisStore = new RedisStore({
+  client: redisClient,
+  prefix: "router:",
+});
+
+app.use(
+    session({
+      store: redisStore,
+      secret: process.env.EXPRESSJS_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: { secure: true },
+    })
+);
+
 const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
 
 app.use(async (req, res) => {
   const host = req.get("host");
   try {
-    let target = await redis.get("routes:" + host);
+    if (req.session.target) {
+      let e = 'e'
+    } else {
+      let target = await redis.get("routes:" + host);
 
-    if (target) {
-      await redis.expire("routes:" + host, 60 * 60 * 24);
-    }
-
-    if (!target) {
-      const result = await pg.query(
-        "SELECT target_route FROM routestable WHERE url = $1",
-        ["https://" + host]
-      );
-
-      if (result.rowCount === 0) {
-        if (req.path === "/canlite") {
-          target = "http://127.0.0.1:9909";
-        } else if (req.path === "/brunyixl") {
-          target = "http://127.0.0.1:6457";
-        } else {
-          return res.sendFile(path.join(__dirname + "/new.html"));
-        }
-      } else {
-        target = result.rows[0].target_route;
+      if (target) {
+        await redis.expire("routes:" + host, 60 * 60 * 24);
       }
 
-      await Promise.all([
-        redis.set("routes:" + host, target, {
-          EX: 60 * 60 * 24
-        }),
-        pg.query(
-          "INSERT INTO routestable (url, target_route) VALUES ($1, $2) ON CONFLICT (url) DO NOTHING",
-          ["https://" + host, target]
-        )
-      ]);
-    }
+      if (!target) {
+        const result = await pg.query(
+            "SELECT target_route FROM routestable WHERE url = $1",
+            ["https://" + host]
+        );
 
-    proxy.web(req, res, { target });
+        if (result.rowCount === 0) {
+          if (req.path === "/canlite") {
+            target = "http://127.0.0.1:9909";
+          } else if (req.path === "/brunyixl") {
+            target = "http://127.0.0.1:6457";
+          } else {
+            return res.sendFile(path.join(__dirname + "/new.html"));
+          }
+        } else {
+          target = result.rows[0].target_route;
+        }
+
+        await Promise.all([
+          redis.set("routes:" + host, target, {
+            EX: 60 * 60 * 24
+          }),
+          pg.query(
+              "INSERT INTO routestable (url, target_route) VALUES ($1, $2) ON CONFLICT (url) DO NOTHING",
+              ["https://" + host, target]
+          )
+        ]);
+      }
+      req.session.target = target;
+    }
+    let targ = req.session.target;
+    proxy.web(req, res, { targ });
 
   } catch (err) {
     console.error(err)
