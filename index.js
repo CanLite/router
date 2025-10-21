@@ -62,6 +62,8 @@ app.use(async (req, res) => {
             target = "http://127.0.0.1:9909";
           } else if (req.path === "/brunyixl") {
             target = "http://127.0.0.1:6457";
+          } else if (req.path === "/francium") {
+            target = "http://127.0.0.1:8365"
           } else {
             return res.sendFile(path.join(__dirname + "/new.html"));
           }
