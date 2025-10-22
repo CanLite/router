@@ -21,6 +21,7 @@ const pg = new Pool({
 });
 
 const app = express();
+const routeCache = new Map();;
 
 let redisStore = new RedisStore({
   client: redis,
@@ -35,6 +36,15 @@ app.use(
       saveUninitialized: false,
       cookie: { secure: true },
     })
+
+
+app.use((req, res, next) => {
+    req.on('aborted', () => {
+        if (!res.writableEnded) res.end();
+        if (req.socket && !req.socket.destroyed) req.socket.destroy();
+    });
+    next();
+});
 );
 
 const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
