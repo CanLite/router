@@ -19,7 +19,7 @@ const pg = new Pool({
 });
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 const proxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
 
 /*
